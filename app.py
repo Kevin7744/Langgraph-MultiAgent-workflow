@@ -170,3 +170,64 @@ def tool_node(state):
     )
 
     return {"messages": [funtion_message]}
+
+
+# Define Edge Logic
+def router(state):
+    messages = state["messages"]
+    last_message = messages[-1]
+    if "function_call" in last_message.additional_kwargs:
+        return "call_tool"
+    if "FINAL ANSWER" in last_message.content:
+        return "end"
+    return "continue"
+
+# Define the Graph
+workflow = StateGraph(AgentState)
+
+workflow.add_node("Researcher", research_node)
+workflow.add_node("Chart Generator", chart_node)
+workflow.add_node("call tool", tool_node)
+
+workflow.add_conditional_edges(
+    "Researcher",
+    router,
+    {"continue": "Chart Generator", "call_tool": "call_tool", "end": END},
+)
+workflow.add_conditional_edges(
+    "Chart Generator",
+    router,
+    {"continue": "Researcher", "call_tool": "call_tool", "end": END},
+)
+
+workflow.add_conditional_edges(
+    "call_tool",
+    # Each agent node updates the 'sender' field
+    # the tool calling node does not, meaning
+    # this edge will route back to the original agent
+    # who invoked the tool
+    lambda x: x["sender"],
+    {
+        "Researcher": "Researcher",
+        "Chart Generator": "Chart Generator",
+    },
+)
+workflow.set_entry_point("Researcher")
+graph = workflow.compile()
+
+
+# Invoke
+for s in graph.stream(
+    {
+        "messages": [
+            HumanMessage(
+                content="Fetch Kenya's GDP over the past 5 years,"
+                "The draw a line graph of it."
+                "Once you code it up, finish"
+            )
+        ],
+    },
+    {"recursion_limit": 150},
+):
+    print(s)
+    print("-----")
