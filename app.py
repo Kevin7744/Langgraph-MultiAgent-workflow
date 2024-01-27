@@ -95,9 +95,7 @@ Define the state of the graph. This will just a list of messages, along with a k
 """
 import operator
 from typing import List, Sequence, Tuple, TypedDict, Union
-
 from langchain.agents import create_openai_functions_agent
-
 from langchain_openai import ChatOpenAI
 from typing_extensions import TypedDict
 
@@ -187,7 +185,7 @@ workflow = StateGraph(AgentState)
 
 workflow.add_node("Researcher", research_node)
 workflow.add_node("Chart Generator", chart_node)
-workflow.add_node("call tool", tool_node)
+workflow.add_node("call_tool", tool_node)
 
 workflow.add_conditional_edges(
     "Researcher",
