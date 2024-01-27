@@ -1,5 +1,30 @@
 import getpass
 import os
+import json
+import functools
+import operator
+
+from typing import List, Sequence, Tuple, TypedDict, Union
+from typing_extensions import TypedDict
+from typing import Annotated
+
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage, 
+    ChatMessage,
+    FunctionMessage, 
+    HumanMessage,
+)
+from langgraph.graph import END, StateGraph
+from langgraph.prebuilt.tool_executor import ToolExecutor, ToolInvocation
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.tools.render import format_tool_to_openai_function
+from langchain_core.tools import tool
+from langchain_experimental.utilities import PythonREPL
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain.agents import create_openai_functions_agent
+from langchain_openai import ChatOpenAI
+
 
 def _set_if_undefined(var: str):
     if not os.environ.get(var):
@@ -18,20 +43,6 @@ os.environ["LANGCHAIN_PROJECT"] = "Multi-agent Collaboration"
 """
 The helper functions will help create agents. These agents will then be nodes in the graph
 """
-import json
-
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage, 
-    ChatMessage,
-    FunctionMessage, 
-    HumanMessage,
-)
-from langgraph.graph import END, StateGraph
-from langgraph.prebuilt.tool_executor import ToolExecutor, ToolInvocation
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.tools.render import format_tool_to_openai_function
-
 def create_agent(llm, tools, system_message: str):
     """Create an agent."""
     functions = [format_tool_to_openai_function(t) for t in tools]
@@ -59,10 +70,6 @@ def create_agent(llm, tools, system_message: str):
 """
 Define the tools that our agents will use in the future
 """
-from langchain_core.tools import tool
-from typing import Annotated
-from langchain_experimental.utilities import PythonREPL
-from langchain_community.tools.tavily_search import TavilySearchResults
 
 tavily_tool = TavilySearchResults(max_results=5)
 
@@ -93,12 +100,6 @@ Create individual agents and tell them how to talk to each other using LangGraph
 """
 Define the state of the graph. This will just a list of messages, along with a key to track the most recent sender
 """
-import operator
-from typing import List, Sequence, Tuple, TypedDict, Union
-from langchain.agents import create_openai_functions_agent
-from langchain_openai import ChatOpenAI
-from typing_extensions import TypedDict
-
 
 # This defines the object that is passed between each node
 class AgentState(TypedDict):
@@ -106,8 +107,6 @@ class AgentState(TypedDict):
     sender: str
 
 # Define agent nodes
-import functools
-
 # Helper function to create a node for a given agent
 def agent_node(state, agent, name):
     result = agent.invoke(state)
