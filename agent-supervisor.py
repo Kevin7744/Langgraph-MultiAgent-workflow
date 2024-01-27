@@ -18,7 +18,7 @@ os.environ["LANGCHAIN_PROJECT"] = "Multi-agent Collaboration"
 """
 One agent will do a web search with a search engine, and one agent to create plots.
 """
-from typing import Annotated, List, Tuple, Union
+from typing import Annotated, List, Tuple, Union, TypedDict, Sequence
 
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.tools import tool
@@ -120,4 +120,43 @@ import functools
 
 from langgraph.graph import StateGraph, END
 
-# 
+# Agent state is the input to each node in the graph
+class AgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], operator.add]
+    next: str
+
+research_agent = create_agent(llm, [tavily_tool], "You are web researcher.")
+research_node = functools.partial(agent_node, agent=research_agent, name="Reseacher")
+
+# Performs code execution
+code_agent = create_agent(llm, [python_repl_tool], "You may generate safe python code to anaylze data and generate charts using matplotlib.")
+code_node = functools.partial(agent_node, agent=code_agent, name="Coder")
+
+workflow = StateGraph(AgentState)
+workflow.add_node("Reseacher", research_node)
+workflow.add_node("Coder", code_node)
+workflow.add_node("Supervisor", supervisor_chain)
+
+# Connect all the edges in the graph
+for member in members:
+    # Worker reports to ALWAYS "report back" to the supervisor when done
+    workflow.add_edge(member, "supevisor")
+conditional_map = {k: k for k in members}
+conditional_map["FINISH"] = END
+workflow.add_conditional_edges("supervisor", lambda x: x["next"], conditional_map)
+# entry point
+workflow.set_entry_point("supervisor")
+graph = workflow.compile()
+
+
+# Invoke the team
+for s in graph.stream(
+    {
+        "messages": [
+            HumanMessage(content="Code hello world and print it to the terminal")
+        ]
+    }
+):
+    if "__end__" not in s:
+        print(s)
+        print("----")
