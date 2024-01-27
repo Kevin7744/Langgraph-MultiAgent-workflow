@@ -1,5 +1,19 @@
 import getpass
 import os
+import operator
+import functools
+
+from typing import Annotated, List, Tuple, Union, TypedDict, Sequence
+
+from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_core.tools import tool
+from langchain_experimental.tools import PythonREPLTool
+from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.output_parsers.openai_functions import JsonOutputFunctionsParser
+from langgraph.graph import StateGraph, END
 
 def _set_if_undefined(var: str):
     if not os.environ.get(var):
@@ -18,11 +32,6 @@ os.environ["LANGCHAIN_PROJECT"] = "Multi-agent Collaboration"
 """
 One agent will do a web search with a search engine, and one agent to create plots.
 """
-from typing import Annotated, List, Tuple, Union, TypedDict, Sequence
-
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_core.tools import tool
-from langchain_experimental.tools import PythonREPLTool
 
 tavily_tool = TavilySearchResults(max_results=5)
 
@@ -31,11 +40,6 @@ python_repl_tool = PythonREPLTool
 
 # Helper Utilities
 """Defining a helper function makes it easy to add new agent worker nodes"""
-from langchain.agents import AgentExecutor, create_openai_tools_agent
-from langchain_core.messages import BaseMessage, HumanMessage
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
 def create_agent(
         llm: ChatOpenAI, tools: list, system_prompt: str
 ):
@@ -62,8 +66,6 @@ def agent_node(state, agent, name):
 
 # Create agent supervisor
 """It will use function to choose the next worker node or finish processing"""
-from langchain.output_parsers.openai_functions import JsonOutputFunctionsParser
-
 members = ["Reseacher", "Coder"]
 system_prompt = (
     "You are a supervisor tasked with managing a conversation between the"
@@ -113,13 +115,7 @@ supervisor_chain = (
     | JsonOutputFunctionsParser()
 )
 
-
 # Construct Graph
-import operator
-import functools
-
-from langgraph.graph import StateGraph, END
-
 # Agent state is the input to each node in the graph
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
